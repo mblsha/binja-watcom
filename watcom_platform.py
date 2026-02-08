@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import struct
+from pathlib import Path
 from typing import Optional, Tuple
 
 from binaryninja import (
@@ -20,6 +21,8 @@ from binaryninja import (
 PLATFORM_NAME = "watcom-dos32-x86"
 OS_NAME = "watcom-dos"
 REGPARM_NAME = "regparm"
+WCDATOOL_RUNTIME_SUFFIX = "_runtime_relocated.bin"
+WCDATOOL_RUNTIME_ZERO_PREFIX_SIZE = 0x10000
 
 _INITIALIZED = False
 
@@ -58,6 +61,61 @@ def _is_watcom_dos32(view: BinaryView) -> bool:
     return new_header_sig in (b"LE", b"LX")
 
 
+def _get_view_filename(view: BinaryView) -> str:
+    file_metadata = getattr(view, "file", None)
+    if file_metadata is None:
+        return ""
+
+    for attr_name in ("original_filename", "filename"):
+        value = getattr(file_metadata, attr_name, None)
+        if isinstance(value, str) and value:
+            return value
+    return ""
+
+
+def _has_expected_wcdatool_sidecar(filename: str) -> bool:
+    path = Path(filename)
+    lowered_name = path.name.lower()
+    if not lowered_name.endswith(WCDATOOL_RUNTIME_SUFFIX):
+        return False
+
+    prefix = path.name[: -len(WCDATOOL_RUNTIME_SUFFIX)]
+    sidecar_candidates = (
+        f"{prefix}_wdump_output_plain.txt",
+        f"{prefix}_wdump_output_parsed.txt",
+    )
+    return any(path.with_name(sidecar).exists() for sidecar in sidecar_candidates)
+
+
+def _looks_like_wcdatool_runtime_image(view: BinaryView) -> bool:
+    if view.length <= 0:
+        return False
+    if view.read(0, 2) == b"MZ":
+        return False
+
+    filename = _get_view_filename(view)
+    lowered_filename = filename.lower()
+    if lowered_filename.endswith(WCDATOOL_RUNTIME_SUFFIX):
+        if _has_expected_wcdatool_sidecar(filename):
+            return True
+
+        # Default wcdatool output keeps runtime base 0, which creates a 64 KiB zero prefix.
+        if view.length > WCDATOOL_RUNTIME_ZERO_PREFIX_SIZE:
+            prefix = view.read(0, WCDATOOL_RUNTIME_ZERO_PREFIX_SIZE)
+            probe = view.read(WCDATOOL_RUNTIME_ZERO_PREFIX_SIZE, 16)
+            if len(prefix) == WCDATOOL_RUNTIME_ZERO_PREFIX_SIZE and not any(prefix) and any(probe):
+                return True
+
+        # Fallback for --compact-base images that may start directly with object data.
+        return True
+
+    return False
+
+
+def _is_watcom_target(view: BinaryView) -> bool:
+    return _is_watcom_dos32(view) or _looks_like_wcdatool_runtime_image(view)
+
+
 def _get_or_create_platform(arch: Architecture) -> Tuple[Platform, bool]:
     platform = Platform.get(PLATFORM_NAME)
     if platform is not None:
@@ -91,7 +149,7 @@ def _register_platform_recognizer(view_name: str, platform: Platform) -> None:
 
     def _recognize_watcom_dos32(view: BinaryView, metadata) -> Optional[Platform]:
         del metadata
-        if _is_watcom_dos32(view):
+        if _is_watcom_target(view):
             return platform
         return None
 

@@ -8,10 +8,11 @@ This plugin registers a custom Binary Ninja platform for Watcom-style 32-bit DOS
 - Uses architecture: `x86`
 - Ensures a `regparm` calling convention exists and makes it the platform default
 - Adds platform recognizers for `Raw` and `Mapped` views
-- Detects targets by checking:
+- Detects classic Watcom DOS32 executables by checking:
   - `MZ` DOS header at offset `0x00`
   - New executable header pointer at `0x3C`
   - `LE` or `LX` signature at the pointed header
+- Detects wcdatool runtime images (`*_runtime_relocated.bin`) by filename and expected runtime image layout
 
 ## Requirements
 
