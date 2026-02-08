@@ -1,0 +1,27 @@
+{
+  "pluginmetadataversion": 2,
+  "name": "Watcom DOS32 Platform",
+  "author": "mblsha",
+  "type": [
+    "helper"
+  ],
+  "api": [
+    "python3"
+  ],
+  "description": "Registers an x86 Watcom MS-DOS 32-bit platform and sets regparm as its default calling convention.",
+  "license": {
+    "name": "MIT"
+  },
+  "platforms": [
+    "Darwin",
+    "Windows",
+    "Linux"
+  ],
+  "installinstructions": {
+    "Darwin": "",
+    "Windows": "",
+    "Linux": ""
+  },
+  "version": "1.0.0",
+  "minimumbinaryninjaversion": 5000
+}

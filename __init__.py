@@ -1,0 +1,3 @@
+from .watcom_platform import register_watcom_dos32_platform
+
+register_watcom_dos32_platform()
